@@ -71,7 +71,7 @@ export default defineConfig([
   },
 ])
 ```
-Hints ON
-<img width="1920" height="947" alt="Hints ON" src="https://github.com/user-attachments/assets/089ff1bb-7bf2-4304-973e-55a7fe662075" />
-Hints OFF
-<img width="1920" height="946" alt="Hints OFF" src="https://github.com/user-attachments/assets/3bae6033-44cd-40ba-8584-ab938d004fb6" />
+### 📸 Interface Preview
+| Hints Enabled (Russian) | Hints Disabled |
+| :---: | :---: |
+| <img width="1920" height="947" alt="Hints ON" src="https://github.com/user-attachments/assets/c5db2ee6-6f29-4dba-acb7-317f6019bcd7" />| <img width="1920" height="946" alt="Hints OFF" src="https://github.com/user-attachments/assets/af38d666-d6e7-4cff-8a50-0bb8a42481a8" /> |
