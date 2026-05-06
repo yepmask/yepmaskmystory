@@ -1,0 +1,31 @@
+@import "tailwindcss";
+
+/* Убиваем горизонтальный скролл и настраиваем нашу панель */
+.custom-scrollbar {
+  overflow-x: hidden !important; /* Намертво скрываем нижний ползунок */
+}
+
+/* --- Стили для Chrome, Edge, Safari, Opera --- */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 5px;  /* Очень тонкий вертикальный ползунок */
+  height: 0px; /* Горизонтальный скроллбар равен нулю (невидимый) */
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent; /* Фон ползунка полностью прозрачный */
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15); /* Полупрозрачный стеклянный ползунок */
+  border-radius: 10px; /* Закругленные края */
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.4); /* Становится ярче, когда наводишь мышку */
+}
+
+/* --- Стили для Firefox --- */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+}
