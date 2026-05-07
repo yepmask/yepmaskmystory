@@ -1,5 +1,5 @@
 # React + TypeScript + Vite
-
+> ### 🔗 [Launch Vibe-Tags App](https://yepmaskmystory.vercel.app)
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
 Currently, two official plugins are available:
@@ -75,3 +75,8 @@ export default defineConfig([
 | Hints Enabled (Russian) | Hints Disabled |
 | :---: | :---: |
 | <img width="1920" height="947" alt="Hints ON" src="https://github.com/user-attachments/assets/c5db2ee6-6f29-4dba-acb7-317f6019bcd7" />| <img width="1920" height="946" alt="Hints OFF" src="https://github.com/user-attachments/assets/af38d666-d6e7-4cff-8a50-0bb8a42481a8" /> |
+## 🚀 Latest Updates
+### **v1.1 — The UX Update**
+- **Smart Search:** Now you can search both by tag names and entire category titles.
+- **DNA Folders (Accordion):** Categories are now collapsible to keep your workspace clean.
+- **Mobile optimization:** Better layout for prompt building on the go.
