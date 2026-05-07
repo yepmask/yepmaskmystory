@@ -71,3 +71,7 @@ export default defineConfig([
   },
 ])
 ```
+### 📸 Interface Preview
+| Hints Enabled (Russian) | Hints Disabled |
+| :---: | :---: |
+| <img width="1920" height="947" alt="Hints ON" src="https://github.com/user-attachments/assets/c5db2ee6-6f29-4dba-acb7-317f6019bcd7" />| <img width="1920" height="946" alt="Hints OFF" src="https://github.com/user-attachments/assets/af38d666-d6e7-4cff-8a50-0bb8a42481a8" /> |
