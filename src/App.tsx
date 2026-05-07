@@ -77,6 +77,19 @@ export default function App() {
   const [copiedStates, setCopiedStates] = useState({ all: false, pos: false, neg: false });
   const [activeTooltip, setActiveTooltip] = useState<any | null>(null);
 
+  // --- ПАМЯТЬ АККОРДЕОНА ---
+  const [collapsedCategories, setCollapsedCategories] = useState<string[]>(() => {
+    return TAG_CATEGORIES.slice(1).map(c => c.title);
+  });
+
+  const toggleCategory = (title: string) => {
+    setCollapsedCategories(prev => 
+      prev.includes(title) 
+        ? prev.filter(t => t !== title) 
+        : [...prev, title]
+    );
+  };
+
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
@@ -106,7 +119,6 @@ export default function App() {
     setPresetName("");
   };
 
-  // --- ЧИСТКА ЛОГОВ ---
   const clearHistory = () => {
     setHistory([]);
     localStorage.removeItem('vibetags_history');
@@ -335,29 +347,67 @@ export default function App() {
             </div>
             <div className="flex-1 overflow-y-auto space-y-12 custom-scrollbar pr-4">
               <h2 className="text-white/20 text-[10px] font-black uppercase tracking-[0.5em] mb-4">DNA Library</h2>
+              
               {TAG_CATEGORIES.map(category => {
-                const filtered = category.tags.filter(tag => tag.name.toLowerCase().includes(searchTerm.toLowerCase()) || tag.translation.toLowerCase().includes(searchTerm.toLowerCase()));
+                const query = searchTerm.toLowerCase();
+                const isCategoryMatch = category.title.toLowerCase().includes(query);
+                
+                const filtered = isCategoryMatch 
+                  ? category.tags 
+                  : category.tags.filter(tag => 
+                      tag.name.toLowerCase().includes(query) || 
+                      tag.translation.toLowerCase().includes(query)
+                    );
+
                 if (!filtered.length) return null;
+                
+                const isCollapsed = collapsedCategories.includes(category.title);
+
                 return (
-                  <div key={category.title} className="space-y-8 relative">
-                    <div className="flex items-center gap-4 sticky top-0 z-10 py-2">
-                      <div className="h-px flex-1 bg-gradient-to-r from-transparent to-white/10" />
-                      <span className={`text-[10px] font-black uppercase tracking-[0.5em] text-white px-5 py-2 rounded-full border bg-gradient-to-br ${category.color} backdrop-blur-xl shadow-lg transition-all`}>{category.title}</span>
-                      <div className="h-px flex-1 bg-gradient-to-l from-transparent to-white/10" />
+                  <div key={category.title} className="space-y-4 relative">
+                    <div 
+                      className="flex items-center gap-4 sticky top-0 z-10 py-2 cursor-pointer group"
+                      onClick={() => toggleCategory(category.title)}
+                    >
+                      <div className="h-px flex-1 bg-gradient-to-r from-transparent to-white/10 group-hover:to-cyan-500/50 transition-all" />
+                      <span className={`text-[10px] font-black uppercase tracking-[0.5em] text-white px-5 py-2 rounded-full border bg-gradient-to-br ${category.color} backdrop-blur-xl shadow-lg transition-all flex items-center gap-3`}>
+                        {category.title}
+                        <span className="text-[12px] opacity-60">
+                          {isCollapsed ? '▼' : '▲'}
+                        </span>
+                      </span>
+                      <div className="h-px flex-1 bg-gradient-to-l from-transparent to-white/10 group-hover:from-cyan-500/50 transition-all" />
                     </div>
-                    <div className="flex flex-wrap gap-3 px-2">
-                      {filtered.map(tagObj => {
-                        const isSel = isNegativeTarget ? selectedNegativeTags.includes(tagObj.name) : selectedTags.includes(tagObj.name);
-                        return (
-                          <button key={tagObj.name} onClick={() => addTag(tagObj.name)} onMouseEnter={e => hintsEnabled && setActiveTooltip({ tag: tagObj, x: e.clientX, y: e.clientY })} onMouseLeave={() => setActiveTooltip(null)} className={`px-5 py-2.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all border ${isSel ? 'bg-white/[0.01] text-white/10 border-transparent cursor-not-allowed shadow-none' : `bg-white/[0.04] text-white/60 hover:bg-white hover:text-black ${category.color.split(' ').find(c => c.startsWith('border-')) || 'border-white/5'} shadow-sm active:scale-95`}`}>
-                            {tagObj.name}
-                          </button>
-                        );
-                      })}
-                    </div>
+
+                    {!isCollapsed && (
+                      <div className="flex flex-wrap gap-3 px-2">
+                        {filtered.map(tagObj => {
+                          const isSel = isNegativeTarget ? selectedNegativeTags.includes(tagObj.name) : selectedTags.includes(tagObj.name);
+                          
+                          // Безопасно формируем классы для кнопки без безумных вложенных кавычек
+                          const borderClass = category.color.split(' ').find((c: any) => c.startsWith('border-')) || 'border-white/5';
+                          const buttonStateClass = isSel 
+                            ? 'bg-white/[0.01] text-white/10 border-transparent cursor-not-allowed shadow-none' 
+                            : `bg-white/[0.04] text-white/60 hover:bg-white hover:text-black ${borderClass} shadow-sm active:scale-95`;
+
+                          return (
+                            <button 
+                              key={tagObj.name} 
+                              onClick={() => addTag(tagObj.name)} 
+                              onMouseEnter={e => hintsEnabled && setActiveTooltip({ tag: tagObj, x: e.clientX, y: e.clientY })} 
+                              onMouseLeave={() => setActiveTooltip(null)} 
+                              className={`px-5 py-2.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all border ${buttonStateClass}`}
+                            >
+                              {tagObj.name}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 );
               })}
+
             </div>
           </div>
         </div>
