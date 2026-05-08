@@ -23,7 +23,7 @@ import { snapCenterToCursor } from '@dnd-kit/modifiers';
 import { CSS } from '@dnd-kit/utilities';
 import { TAG_CATEGORIES, type TagItem } from './tags';
 
-// Новый тип данных: теперь у каждого тега есть скрытый ID
+// Наш новый тип: у каждого тега есть уникальный номер (ID)
 interface SelectedTag {
   id: string;
   text: string;
@@ -105,7 +105,6 @@ export default function App() {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        // Миграция старых пресетов (строк) в новый формат с ID
         const migrated = parsed.map((p: any) => ({
           ...p,
           positive: p.positive.map((t: any) => typeof t === 'string' ? { id: Math.random().toString(36).substring(2, 9), text: t } : t),
@@ -181,12 +180,14 @@ export default function App() {
     }
   };
 
+  // --- ВОТ ОНА, БРОНЕБОЙНАЯ ФУНКЦИЯ ДОБАВЛЕНИЯ ---
   const addTag = (tagText: string) => {
     const clean = tagText.trim();
     if (!clean) return;
     
-    // Генерируем уникальный ID для каждого нового тега
-    const newTag = { id: Math.random().toString(36).substring(2, 11), text: clean };
+    // Генерируем супер-уникальный ID на каждое нажатие
+    const newId = Date.now().toString(36) + Math.random().toString(36).substring(2, 9);
+    const newTag = { id: newId, text: clean };
     
     if (isNegativeTarget) {
       setSelectedNegativeTags(prev => [...prev, newTag]);
@@ -411,6 +412,9 @@ export default function App() {
                       <div className="flex flex-wrap gap-3 px-2">
                         {filtered.map(tagObj => {
                           const borderClass = category.color.split(' ').find((c: any) => c.startsWith('border-')) || 'border-white/5';
+                          
+                          // Я УБРАЛ отсюда любые проверки на то, выбран тег или нет. 
+                          // Кнопка всегда активна, всегда нажимается, добавляет тег сколько угодно раз!
                           const buttonStateClass = `bg-white/[0.04] text-white/60 hover:bg-white hover:text-black ${borderClass} shadow-sm active:scale-95`;
 
                           return (
