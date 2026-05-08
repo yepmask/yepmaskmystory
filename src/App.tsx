@@ -23,6 +23,12 @@ import { snapCenterToCursor } from '@dnd-kit/modifiers';
 import { CSS } from '@dnd-kit/utilities';
 import { TAG_CATEGORIES, type TagItem } from './tags';
 
+// Новый тип данных: теперь у каждого тега есть скрытый ID
+interface SelectedTag {
+  id: string;
+  text: string;
+}
+
 const TagCapsule = ({ displayName, variant, isDragging, onRemove, onWeight, onMouseEnter, onMouseLeave, listeners, attributes, style }: any) => {
   const isPos = variant === 'positive';
   return (
@@ -62,8 +68,8 @@ function SortableTag(props: any) {
 }
 
 export default function App() {
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [selectedNegativeTags, setSelectedNegativeTags] = useState<string[]>([]);
+  const [selectedTags, setSelectedTags] = useState<SelectedTag[]>([]);
+  const [selectedNegativeTags, setSelectedNegativeTags] = useState<SelectedTag[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [hintsEnabled, setHintsEnabled] = useState(true);
   const [isNegativeTarget, setIsNegativeTarget] = useState(false);
@@ -77,7 +83,6 @@ export default function App() {
   const [copiedStates, setCopiedStates] = useState({ all: false, pos: false, neg: false });
   const [activeTooltip, setActiveTooltip] = useState<any | null>(null);
 
-  // --- ПАМЯТЬ АККОРДЕОНА ---
   const [collapsedCategories, setCollapsedCategories] = useState<string[]>(() => {
     return TAG_CATEGORIES.slice(1).map(c => c.title);
   });
@@ -97,7 +102,20 @@ export default function App() {
 
   useEffect(() => {
     const saved = localStorage.getItem('vibetags_presets');
-    if (saved) setPresets(JSON.parse(saved));
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        // Миграция старых пресетов (строк) в новый формат с ID
+        const migrated = parsed.map((p: any) => ({
+          ...p,
+          positive: p.positive.map((t: any) => typeof t === 'string' ? { id: Math.random().toString(36).substring(2, 9), text: t } : t),
+          negative: p.negative.map((t: any) => typeof t === 'string' ? { id: Math.random().toString(36).substring(2, 9), text: t } : t)
+        }));
+        setPresets(migrated);
+      } catch (e) {
+        console.error("Failed to parse presets");
+      }
+    }
     const hist = localStorage.getItem('vibetags_history');
     if (hist) setHistory(JSON.parse(hist));
     const hint = localStorage.getItem('vibetags_hints');
@@ -137,45 +155,55 @@ export default function App() {
     const overIdStr = over.id as string;
     const activeContainer = activeIdStr.startsWith('pos-') ? 'pos' : 'neg';
     const overContainer = overIdStr.startsWith('pos-') || overIdStr === 'pos-container' ? 'pos' : 'neg';
-    const activeTag = activeIdStr.replace(/^(pos-|neg-)/, '');
-    const overTag = overIdStr.replace(/^(pos-|neg-)/, '');
+    const activeTagId = activeIdStr.replace(/^(pos-|neg-)/, '');
+    const overTagId = overIdStr.replace(/^(pos-|neg-)/, '');
 
     if (activeContainer === overContainer) {
       const setList = activeContainer === 'pos' ? setSelectedTags : setSelectedNegativeTags;
       const items = activeContainer === 'pos' ? selectedTags : selectedNegativeTags;
-      const oldIndex = items.indexOf(activeTag);
-      const newIndex = items.indexOf(overTag);
-      if (oldIndex !== newIndex) setList((prev) => arrayMove(prev, oldIndex, newIndex));
+      const oldIndex = items.findIndex(t => t.id === activeTagId);
+      const newIndex = items.findIndex(t => t.id === overTagId);
+      if (oldIndex !== -1 && newIndex !== -1 && oldIndex !== newIndex) {
+        setList((prev) => arrayMove(prev, oldIndex, newIndex));
+      }
     } else {
+      const sourceList = activeContainer === 'pos' ? selectedTags : selectedNegativeTags;
+      const tagObj = sourceList.find(t => t.id === activeTagId);
+      if (!tagObj) return;
+
       if (activeContainer === 'pos') {
-        setSelectedTags(prev => prev.filter(t => t !== activeTag));
-        setSelectedNegativeTags(prev => [...new Set([...prev, activeTag])]);
+        setSelectedTags(prev => prev.filter(t => t.id !== activeTagId));
+        setSelectedNegativeTags(prev => [...prev, tagObj]);
       } else {
-        setSelectedNegativeTags(prev => prev.filter(t => t !== activeTag));
-        setSelectedTags(prev => [...new Set([...prev, activeTag])]);
+        setSelectedNegativeTags(prev => prev.filter(t => t.id !== activeTagId));
+        setSelectedTags(prev => [...prev, tagObj]);
       }
     }
   };
 
-  const addTag = (tag: string) => {
-    const clean = tag.trim();
+  const addTag = (tagText: string) => {
+    const clean = tagText.trim();
     if (!clean) return;
+    
+    // Генерируем уникальный ID для каждого нового тега
+    const newTag = { id: Math.random().toString(36).substring(2, 11), text: clean };
+    
     if (isNegativeTarget) {
-      if (!selectedNegativeTags.includes(clean)) setSelectedNegativeTags(prev => [...prev, clean]);
+      setSelectedNegativeTags(prev => [...prev, newTag]);
     } else {
-      if (!selectedTags.includes(clean)) setSelectedTags(prev => [...prev, clean]);
+      setSelectedTags(prev => [...prev, newTag]);
     }
   };
 
-  const handleWeight = (tag: string, isNegative: boolean) => {
+  const handleWeight = (id: string, isNegative: boolean) => {
     const setList = isNegative ? setSelectedNegativeTags : setSelectedTags;
     setList(prev => prev.map((item) => {
-      if (item === tag) {
-        const match = item.match(/^\((.*):(\d\.\d)\)$/);
-        if (!match) return `(${item}:1.1)`;
+      if (item.id === id) {
+        const match = item.text.match(/^\((.*):(\d\.\d)\)$/);
+        if (!match) return { ...item, text: `(${item.text}:1.1)` };
         const name = match[1];
         const w = parseFloat(match[2]);
-        return w >= 1.5 ? name : `(${name}:${(w + 0.1).toFixed(1)})`;
+        return { ...item, text: w >= 1.5 ? name : `(${name}:${(w + 0.1).toFixed(1)})` };
       }
       return item;
     }));
@@ -278,7 +306,7 @@ export default function App() {
               </div>
               <div className="flex items-center gap-3">
                 <button onClick={() => setShowHistory(true)} className="p-4 rounded-2xl bg-white/[0.05] border border-white/10 text-white/40 hover:text-white transition-all shadow-lg"><Clock size={20}/></button>
-                <button onClick={() => copy(selectedTags.join(', ') + '\n\nNegative: ' + selectedNegativeTags.join(', '), 'all')} className="flex items-center gap-3 px-8 py-4 rounded-2xl bg-cyan-500 text-black font-black uppercase text-[10px] tracking-[0.2em] hover:bg-white transition-all shadow-xl">
+                <button onClick={() => copy(selectedTags.map(t => t.text).join(', ') + '\n\nNegative: ' + selectedNegativeTags.map(t => t.text).join(', '), 'all')} className="flex items-center gap-3 px-8 py-4 rounded-2xl bg-cyan-500 text-black font-black uppercase text-[10px] tracking-[0.2em] hover:bg-white transition-all shadow-xl">
                   {copiedStates.all ? <Check size={18}/> : <Copy size={18}/>} {copiedStates.all ? 'Copied' : 'Copy All'}
                 </button>
               </div>
@@ -301,16 +329,16 @@ export default function App() {
                   <h2 className={`text-[10px] font-black uppercase tracking-[0.5em] transition-colors ${!isNegativeTarget ? 'text-cyan-400' : 'text-white/20'}`}>Positive DNA</h2>
                   <div className="flex gap-4">
                     <button onClick={(e) => { e.stopPropagation(); setSelectedTags([]); }} className="text-white/10 hover:text-red-500 transition-colors"><Trash2 size={20}/></button>
-                    <button onClick={(e) => { e.stopPropagation(); copy(selectedTags.join(', '), 'pos'); }} className="flex items-center gap-2 px-6 py-2 rounded-full bg-white/5 text-white text-[9px] font-black tracking-widest border border-white/10 hover:bg-white hover:text-black shadow-sm">
+                    <button onClick={(e) => { e.stopPropagation(); copy(selectedTags.map(t => t.text).join(', '), 'pos'); }} className="flex items-center gap-2 px-6 py-2 rounded-full bg-white/5 text-white text-[9px] font-black tracking-widest border border-white/10 hover:bg-white hover:text-black shadow-sm">
                       {copiedStates.pos ? <Check size={14}/> : <Copy size={14}/>} {copiedStates.pos ? 'Copied' : 'Copy'}
                     </button>
                   </div>
                 </div>
                 <div className="flex-1 overflow-y-auto custom-scrollbar p-1">
-                  <SortableContext items={selectedTags.map(t => `pos-${t}`)} strategy={rectSortingStrategy}>
+                  <SortableContext items={selectedTags.map(t => `pos-${t.id}`)} strategy={rectSortingStrategy}>
                     <div className="flex flex-wrap gap-4 content-start pb-4">
                       {selectedTags.map((tag) => (
-                        <SortableTag key={`pos-${tag}`} id={`pos-${tag}`} displayName={tag} variant="positive" onRemove={() => setSelectedTags(prev => prev.filter(t => t !== tag))} onWeight={() => handleWeight(tag, false)} onMouseEnter={(e: any) => hintsEnabled && setActiveTooltip({ tag: findTagInfo(tag), x: e.clientX, y: e.clientY })} onMouseLeave={() => setActiveTooltip(null)} />
+                        <SortableTag key={`pos-${tag.id}`} id={`pos-${tag.id}`} displayName={tag.text} variant="positive" onRemove={() => setSelectedTags(prev => prev.filter(t => t.id !== tag.id))} onWeight={() => handleWeight(tag.id, false)} onMouseEnter={(e: any) => hintsEnabled && setActiveTooltip({ tag: findTagInfo(tag.text), x: e.clientX, y: e.clientY })} onMouseLeave={() => setActiveTooltip(null)} />
                       ))}
                     </div>
                   </SortableContext>
@@ -322,16 +350,16 @@ export default function App() {
                   <h2 className={`text-[10px] font-black uppercase tracking-[0.5em] transition-colors ${isNegativeTarget ? 'text-red-400' : 'text-white/20'}`}>Negative DNA</h2>
                   <div className="flex gap-4">
                     <button onClick={(e) => { e.stopPropagation(); setSelectedNegativeTags([]); }} className="text-white/10 hover:text-red-500 transition-colors"><Trash2 size={20}/></button>
-                    <button onClick={(e) => { e.stopPropagation(); copy(selectedNegativeTags.join(', '), 'neg'); }} className="flex items-center gap-2 px-6 py-2 rounded-full bg-white/5 text-white text-[9px] font-black tracking-widest border border-white/10 hover:bg-white hover:text-black shadow-sm">
+                    <button onClick={(e) => { e.stopPropagation(); copy(selectedNegativeTags.map(t => t.text).join(', '), 'neg'); }} className="flex items-center gap-2 px-6 py-2 rounded-full bg-white/5 text-white text-[9px] font-black tracking-widest border border-white/10 hover:bg-white hover:text-black shadow-sm">
                       {copiedStates.neg ? <Check size={14}/> : <Copy size={14}/>} {copiedStates.neg ? 'Copied' : 'Copy'}
                     </button>
                   </div>
                 </div>
                 <div className="flex-1 overflow-y-auto custom-scrollbar p-1">
-                  <SortableContext items={selectedNegativeTags.map(t => `neg-${t}`)} strategy={rectSortingStrategy}>
+                  <SortableContext items={selectedNegativeTags.map(t => `neg-${t.id}`)} strategy={rectSortingStrategy}>
                     <div className="flex flex-wrap gap-4 content-start pb-4">
                       {selectedNegativeTags.map((tag) => (
-                        <SortableTag key={`neg-${tag}`} id={`neg-${tag}`} displayName={tag} variant="negative" onRemove={() => setSelectedNegativeTags(prev => prev.filter(t => t !== tag))} onWeight={() => handleWeight(tag, true)} onMouseEnter={(e: any) => hintsEnabled && setActiveTooltip({ tag: findTagInfo(tag), x: e.clientX, y: e.clientY })} onMouseLeave={() => setActiveTooltip(null)} />
+                        <SortableTag key={`neg-${tag.id}`} id={`neg-${tag.id}`} displayName={tag.text} variant="negative" onRemove={() => setSelectedNegativeTags(prev => prev.filter(t => t.id !== tag.id))} onWeight={() => handleWeight(tag.id, true)} onMouseEnter={(e: any) => hintsEnabled && setActiveTooltip({ tag: findTagInfo(tag.text), x: e.clientX, y: e.clientY })} onMouseLeave={() => setActiveTooltip(null)} />
                       ))}
                     </div>
                   </SortableContext>
@@ -382,13 +410,8 @@ export default function App() {
                     {!isCollapsed && (
                       <div className="flex flex-wrap gap-3 px-2">
                         {filtered.map(tagObj => {
-                          const isSel = isNegativeTarget ? selectedNegativeTags.includes(tagObj.name) : selectedTags.includes(tagObj.name);
-                          
-                          // Безопасно формируем классы для кнопки без безумных вложенных кавычек
                           const borderClass = category.color.split(' ').find((c: any) => c.startsWith('border-')) || 'border-white/5';
-                          const buttonStateClass = isSel 
-                            ? 'bg-white/[0.01] text-white/10 border-transparent cursor-not-allowed shadow-none' 
-                            : `bg-white/[0.04] text-white/60 hover:bg-white hover:text-black ${borderClass} shadow-sm active:scale-95`;
+                          const buttonStateClass = `bg-white/[0.04] text-white/60 hover:bg-white hover:text-black ${borderClass} shadow-sm active:scale-95`;
 
                           return (
                             <button 
@@ -413,9 +436,13 @@ export default function App() {
         </div>
 
         <DragOverlay adjustScale={false} zIndex={1000}>
-          {activeId ? (
-            <TagCapsule displayName={activeId.split('-').slice(1).join('-')} variant={activeId.startsWith('pos-') ? 'positive' : 'negative'} />
-          ) : null}
+          {activeId ? (() => {
+            const isPos = activeId.startsWith('pos-');
+            const activeTagId = activeId.replace(/^(pos-|neg-)/, '');
+            const sourceList = isPos ? selectedTags : selectedNegativeTags;
+            const tagObj = sourceList.find(t => t.id === activeTagId);
+            return tagObj ? <TagCapsule displayName={tagObj.text} variant={isPos ? 'positive' : 'negative'} /> : null;
+          })() : null}
         </DragOverlay>
 
         <AnimatePresence>
