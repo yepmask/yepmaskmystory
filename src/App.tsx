@@ -23,11 +23,13 @@ import { snapCenterToCursor } from '@dnd-kit/modifiers';
 import { CSS } from '@dnd-kit/utilities';
 import { TAG_CATEGORIES, type TagItem } from './tags';
 
-// Наш новый тип: у каждого тега есть уникальный номер (ID)
 interface SelectedTag {
   id: string;
   text: string;
 }
+
+// Вспомогательная функция, чтобы счетчик узнавал тег, даже если у него изменился вес (neon:1.2)
+const getCleanName = (tagName: string) => tagName.replace(/^\((.*):(\d\.\d)\)$/, '$1');
 
 const TagCapsule = ({ displayName, variant, isDragging, onRemove, onWeight, onMouseEnter, onMouseLeave, listeners, attributes, style }: any) => {
   const isPos = variant === 'positive';
@@ -180,15 +182,11 @@ export default function App() {
     }
   };
 
-  // --- ВОТ ОНА, БРОНЕБОЙНАЯ ФУНКЦИЯ ДОБАВЛЕНИЯ ---
   const addTag = (tagText: string) => {
     const clean = tagText.trim();
     if (!clean) return;
-    
-    // Генерируем супер-уникальный ID на каждое нажатие
     const newId = Date.now().toString(36) + Math.random().toString(36).substring(2, 9);
     const newTag = { id: newId, text: clean };
-    
     if (isNegativeTarget) {
       setSelectedNegativeTags(prev => [...prev, newTag]);
     } else {
@@ -211,7 +209,7 @@ export default function App() {
   };
 
   const findTagInfo = (tagName: string): TagItem => {
-    const cleanName = tagName.replace(/^\((.*):(\d\.\d)\)$/, '$1');
+    const cleanName = getCleanName(tagName);
     for (const category of TAG_CATEGORIES) {
       const found = category.tags.find(tag => tag.name === cleanName);
       if (found) return found;
@@ -412,10 +410,12 @@ export default function App() {
                       <div className="flex flex-wrap gap-3 px-2">
                         {filtered.map(tagObj => {
                           const borderClass = category.color.split(' ').find((c: any) => c.startsWith('border-')) || 'border-white/5';
-                          
-                          // Я УБРАЛ отсюда любые проверки на то, выбран тег или нет. 
-                          // Кнопка всегда активна, всегда нажимается, добавляет тег сколько угодно раз!
                           const buttonStateClass = `bg-white/[0.04] text-white/60 hover:bg-white hover:text-black ${borderClass} shadow-sm active:scale-95`;
+
+                          // Считаем сколько раз тег добавлен в активный блок (позитивный или негативный)
+                          const activeCount = isNegativeTarget 
+                            ? selectedNegativeTags.filter(t => getCleanName(t.text) === tagObj.name).length
+                            : selectedTags.filter(t => getCleanName(t.text) === tagObj.name).length;
 
                           return (
                             <button 
@@ -423,9 +423,16 @@ export default function App() {
                               onClick={() => addTag(tagObj.name)} 
                               onMouseEnter={e => hintsEnabled && setActiveTooltip({ tag: tagObj, x: e.clientX, y: e.clientY })} 
                               onMouseLeave={() => setActiveTooltip(null)} 
-                              className={`px-5 py-2.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all border ${buttonStateClass}`}
+                              className={`relative px-5 py-2.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all border ${buttonStateClass}`}
                             >
                               {tagObj.name}
+                              
+                              {/* Умный бейдж-счетчик */}
+                              {activeCount > 0 && (
+                                <span className={`absolute -top-1.5 -right-1.5 flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[9px] font-black shadow-lg border border-black/50 ${isNegativeTarget ? 'bg-red-500 text-white' : 'bg-cyan-400 text-black'}`}>
+                                  {activeCount}
+                                </span>
+                              )}
                             </button>
                           );
                         })}
